@@ -56,6 +56,10 @@
 #define SCIENTIFIC  33
 #define LITERALSTR  34
 
+#define INTEGERNUM  35
+#define REALNUMBER  36
+#define SCIENTIFIC  37
+
 #define YY_USER_ACTION     col_no += yyleng; // note this line
 
 #define MAX_LINE_LENG      256
@@ -95,6 +99,8 @@ W [wW]
 X [xX]
 Y [yY]
 Z [zZ]
+
+%x CMNT
 
 %%
                              /* v could do something */
@@ -141,12 +147,30 @@ Z [zZ]
 
   /* define identifier here */
 
+
   /* define INTEGERNUM, REALNUMBER, SCIENTIFIC here */
+[+-]?[0-9]+(\.)?([0-9]+)?(E[+-]?)?[0-9]+    {LOG(KEYWORD); return(SCIENTIFIC); }
 
   /* define single/multiple line comment here */
 
-  /* define string constant (LITERALSTR) here */
+ /* "//".* {printf("Skip single line comment");}
+ /* <S_CMNT>\n { BEGIN INITIAL ; } */
 
+"/*" { BEGIN CMNT ; }
+<CMNT>. {} 
+<CMNT>\n {}
+<CMNT>"*/" { BEGIN INITIAL ; }
+
+  /* define string constant (LITERALSTR) here */
+\"[^"]*\" {
+    if ('\\' == yytext[yyleng-2]) {
+        yyless(yyleng-1);
+        yymore();
+    } else {
+        return LITERALSTR;
+    };
+
+}
   /* define pragma here */
 
 [ \t\f\r]    LIST;
