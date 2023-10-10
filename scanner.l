@@ -62,12 +62,16 @@
 #define LIST       strcat(buffer, yytext)
 #define LIST_FLUSH do{ if(opt_list) printf("%s", buffer); *buffer = 0; }while(0)
 #define LOG(TYPE) do{ LIST; fprintf(stderr, "token(type:%-10s) on line %4d, %3d : %s\n", #TYPE, line_no, col_no - yyleng, yytext); } while(0)
+                                    
+#define CMD_START do{ fprintf(stderr, "[INFO ] line %4d:%3d comment string start\n",  line_no, col_no - yyleng); } while(0)
+#define CMD_END do{ fprintf(stderr, "[INFO ] line %4d:%3d comment string end\n", line_no, col_no - yyleng); } while(0)
+#define CMD_SCMT do{ fprintf(stderr, "[INFO ] line %4d:%3d comment string\n", line_no, col_no - yyleng); } while(0)
 
 int opt_list = 1;
 int line_no = 1, col_no = 1;
 char buffer[MAX_LINE_LENG];
 
-int i=0;
+int cmnt_count=0;
 
 %}
 
@@ -99,7 +103,6 @@ Y [yY]
 Z [zZ]
 
 %x CMNT
-%x SCMNT
 %s PRAGMA
 
 %%
@@ -146,25 +149,33 @@ Z [zZ]
 "!="                        {LOG(KEYWORD); return(NEQOP);      }
 
   /* define identifier here */
- /* [a-zA-Z]+[0-9a-zA-Z_]*[^_]$ { LOG(IDENTIFIER); return(IDENTIFIER); }*/
-[a-zA-Z]+[_0-9a-zA-Z]*[0-9a-zA-Z]+ { LOG(IDENTIFIER); return(IDENTIFIER); }
- /* [a-zA-Z][a-zA-Z0-9]*(_*[a-zA-Z0-9]+)*  { LOG(IDENTIFIER); return(IDENTIFIER); }*/
+[a-zA-Z]([_0-9a-zA-Z]*[0-9a-zA-Z])* { LOG(IDENTIFIER); return(IDENTIFIER); }
+
   /* define INTEGERNUM, REALNUMBER, SCIENTIFIC here */
 
-(0|[1-9]+[0-9]*) { LOG(NUMBER); return(INTEGERNUM);  }
-(0|[1-9]+[0-9]*)\.[0-9]+ { LOG(NUMBER); return(REALNUMBER); }
-(0|[1-9]+[0-9]*|(0|[1-9]+)\.[0-9]+)(E[+-]?[0-9]+)?  { LOG(NUMBER); return(SCIENTIFIC); }
+[0-9]+ { LOG(NUMBER); return(INTEGERNUM);  }
+[0-9]+\.[0-9]+ { LOG(NUMBER); return(REALNUMBER); }
+ 
+([0-9]+|[0-9]+\.[0-9]+)[Ee][+-]?[0-9]+ {
+    LOG(NUMBER);
+    return(SCIENTIFIC);
+}
 
   /* define single/multiple line comment here */
 
- /*\/\/.* { LIST; BEGIN CMNT; }
-<SCMNT>\n { LIST; LIST_FLUSH; line_no++, col_no = 1;  BEGIN INITIAL;} */
-"//".* { LIST; }
+"//".* { LIST; CMD_SCMT; }
 
-"/*" { LIST; BEGIN CMNT ; }
-<CMNT>. { LIST; } 
+"/*" { LIST; CMD_START; BEGIN CMNT; cmnt_count+=1;}
+<CMNT>. { LIST; }
 <CMNT>\n { LIST; LIST_FLUSH; line_no++, col_no = 1; }
-<CMNT>"*/" { LIST; LIST_FLUSH;  BEGIN INITIAL; }
+<CMNT>"*/" { 
+  if(cmnt_count>1) {
+    LIST;
+    cmnt_count-=1;
+  } else {
+    LIST; CMD_END; BEGIN INITIAL; cmnt_count=0;
+  }
+}
 
   /* define string constant (LITERALSTR) here */
 \"[^"]*\" {
@@ -173,7 +184,7 @@ Z [zZ]
         yymore();
     } else {
         LOG(STRING);
-        return LITERALSTR;
+        return (LITERALSTR);
     };
 }
   /* define pragma here */
