@@ -165,15 +165,15 @@ Z [zZ]
 
 "//".* { LIST; CMD_SCMT; }
 
-"/*" { LIST; CMD_START; BEGIN CMNT; cmnt_count+=1;}
+"/*" { LIST; CMD_START; BEGIN CMNT; cmnt_count += 1; }
 <CMNT>. { LIST; }
+<CMNT>"/*" { LIST; cmnt_count += 1; }
 <CMNT>\n { LIST; LIST_FLUSH; line_no++, col_no = 1; }
-<CMNT>"*/" { 
-  if(cmnt_count>1) {
-    LIST;
-    cmnt_count-=1;
+<CMNT>"*/" {
+  if (cmnt_count > 1) {
+     LIST; cmnt_count -= 1;
   } else {
-    LIST; CMD_END; BEGIN INITIAL; cmnt_count=0;
+     LIST; CMD_END; BEGIN INITIAL; cmnt_count=0;
   }
 }
 
