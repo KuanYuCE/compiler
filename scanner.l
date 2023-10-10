@@ -56,10 +56,6 @@
 #define SCIENTIFIC  33
 #define LITERALSTR  34
 
-#define INTEGERNUM  35
-#define REALNUMBER  36
-#define SCIENTIFIC  37
-
 #define YY_USER_ACTION     col_no += yyleng; // note this line
 
 #define MAX_LINE_LENG      256
@@ -70,6 +66,8 @@
 int opt_list = 1;
 int line_no = 1, col_no = 1;
 char buffer[MAX_LINE_LENG];
+
+int i=0;
 
 %}
 
@@ -101,6 +99,8 @@ Y [yY]
 Z [zZ]
 
 %x CMNT
+%x SCMNT
+%s PRAGMA
 
 %%
                              /* v could do something */
@@ -146,20 +146,25 @@ Z [zZ]
 "!="                        {LOG(KEYWORD); return(NEQOP);      }
 
   /* define identifier here */
-
-
+ /* [a-zA-Z]+[0-9a-zA-Z_]*[^_]$ { LOG(IDENTIFIER); return(IDENTIFIER); }*/
+[a-zA-Z]+[_0-9a-zA-Z]*[0-9a-zA-Z]+ { LOG(IDENTIFIER); return(IDENTIFIER); }
+ /* [a-zA-Z][a-zA-Z0-9]*(_*[a-zA-Z0-9]+)*  { LOG(IDENTIFIER); return(IDENTIFIER); }*/
   /* define INTEGERNUM, REALNUMBER, SCIENTIFIC here */
-[+-]?[0-9]+(\.)?([0-9]+)?(E[+-]?)?[0-9]+    {LOG(KEYWORD); return(SCIENTIFIC); }
+
+(0|[1-9]+[0-9]*) { LOG(NUMBER); return(INTEGERNUM);  }
+(0|[1-9]+[0-9]*)\.[0-9]+ { LOG(NUMBER); return(REALNUMBER); }
+(0|[1-9]+[0-9]*|(0|[1-9]+)\.[0-9]+)(E[+-]?[0-9]+)?  { LOG(NUMBER); return(SCIENTIFIC); }
 
   /* define single/multiple line comment here */
 
- /* "//".* {printf("Skip single line comment");}
- /* <S_CMNT>\n { BEGIN INITIAL ; } */
+ /*\/\/.* { LIST; BEGIN CMNT; }
+<SCMNT>\n { LIST; LIST_FLUSH; line_no++, col_no = 1;  BEGIN INITIAL;} */
+"//".* { LIST; }
 
-"/*" { BEGIN CMNT ; }
-<CMNT>. {} 
-<CMNT>\n {}
-<CMNT>"*/" { BEGIN INITIAL ; }
+"/*" { LIST; BEGIN CMNT ; }
+<CMNT>. { LIST; } 
+<CMNT>\n { LIST; LIST_FLUSH; line_no++, col_no = 1; }
+<CMNT>"*/" { LIST; LIST_FLUSH;  BEGIN INITIAL; }
 
   /* define string constant (LITERALSTR) here */
 \"[^"]*\" {
@@ -167,11 +172,14 @@ Z [zZ]
         yyless(yyleng-1);
         yymore();
     } else {
+        LOG(STRING);
         return LITERALSTR;
     };
-
 }
   /* define pragma here */
+#[ \t]*pragma[ \t]+list[ \t]+on { LIST; opt_list=1; }
+#[ \t]*pragma[ \t]+list[ \t]+off { LIST; opt_list=0; }
+
 
 [ \t\f\r]    LIST;
 
